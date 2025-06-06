@@ -2,6 +2,7 @@ fastapi
 uvicorn[standard]
 supabase
 pydantic
+pydantic-settings
 python-dotenv
 pytest
 pytest-asyncio

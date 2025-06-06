@@ -5,6 +5,7 @@ This is a FastAPI application to manage localizations.
 ## Setup
 
 1.  Create a virtual environment (optional but recommended):
+
     ```bash
     python -m venv venv
     source venv/bin/activate  # On Windows use `venv\Scripts\activate`

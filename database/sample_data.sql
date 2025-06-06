@@ -42,5 +42,6 @@ INSERT INTO translations (translation_key_id, language_code, value, updated_by) 
     ('660e8400-e29b-41d4-a716-446655440001', 'fr', 'Enregistrer', 'admin'),
     ('660e8400-e29b-41d4-a716-446655440002', 'fr', 'Annuler', 'admin'),
     ('660e8400-e29b-41d4-a716-446655440003', 'fr', 'Bienvenue dans notre application!', 'admin'),
-    ('660e8400-e29b-41d4-a716-446655440004', 'fr', 'La ressource demandée n\'a pas été trouvée.', 'admin')
+    ('660e8400-e29b-41d4-a716-446655440004', 'fr', 'La ressource demandée n''a pas été trouvée.', 'admin')
     -- Note: Dashboard translation missing in French (to test missing translations feature)
+ON CONFLICT (translation_key_id, language_code) DO NOTHING;

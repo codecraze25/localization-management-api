@@ -32,18 +32,11 @@ class TranslationService:
         if category:
             query = query.eq("category", category)
 
-        # Get total count
-        count_response = supabase.table("translation_keys").select("id", count="exact").eq("project_id", project_id).execute()
-        total = count_response.count if count_response.count else 0
-
-        # Apply pagination
-        offset = (page - 1) * limit
-        query = query.range(offset, offset + limit - 1)
-
+        # Get all filtered data first to apply missing translations filter and calculate correct count
         result = query.execute()
 
-        # Transform data
-        translation_keys = []
+        # Transform data and apply missing translations filter
+        filtered_translation_keys = []
         for row in result.data:
             translations = {}
             for trans in row.get("translations", []):
@@ -53,20 +46,29 @@ class TranslationService:
                     updated_by=trans["updated_by"]
                 )
 
-            # Filter by missing translations if requested
+            # Apply missing translations filter if requested
             if missing_translations and language_code:
+                # Show only keys that DON'T have the specified language translation
                 if language_code in translations:
                     continue
 
-            translation_keys.append(TranslationKey(
+            translation_key = TranslationKey(
                 id=row["id"],
                 key=row["key"],
                 category=row["category"],
                 description=row.get("description"),
                 translations=translations
-            ))
+            )
+            filtered_translation_keys.append(translation_key)
 
-        return translation_keys, total
+        # Calculate total after all filters are applied
+        total = len(filtered_translation_keys)
+
+        # Apply pagination to the filtered results
+        offset = (page - 1) * limit
+        paginated_keys = filtered_translation_keys[offset:offset + limit]
+
+        return paginated_keys, total
 
     async def get_translation_key_by_id(self, key_id: str) -> Optional[TranslationKey]:
         """Get a single translation key by ID"""
