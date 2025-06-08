@@ -5,7 +5,7 @@ from .config import get_settings
 from .services import TranslationService
 from .models import (
     TranslationKey, GetTranslationKeysResponse, CreateTranslationKeyRequest,
-    UpdateTranslationRequest, BulkUpdateRequest, AnalyticsResponse, Project, Language
+    UpdateTranslationRequest, CreateTranslationRequest, BulkUpdateRequest, AnalyticsResponse, Project, Language
 )
 
 # Initialize FastAPI app
@@ -33,10 +33,6 @@ translation_service = TranslationService()
 # Dependency to get translation service
 def get_translation_service() -> TranslationService:
     return translation_service
-
-@app.get("/")
-async def root():
-    return {"message": "Localization Management API", "version": "1.0.0"}
 
 @app.get("/health")
 async def health_check():
@@ -130,6 +126,46 @@ async def update_translation(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to update translation: {str(e)}")
 
+@app.post("/translations")
+async def create_translation(
+    request: CreateTranslationRequest,
+    service: TranslationService = Depends(get_translation_service)
+):
+    """Create a new translation for an existing translation key"""
+    try:
+        # Check if translation key exists
+        translation_key = await service.get_translation_key_by_id(request.key_id)
+        if not translation_key:
+            raise HTTPException(status_code=404, detail="Translation key not found")
+
+        # Check if translation already exists for this language
+        if request.language_code in translation_key.translations:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Translation already exists for language '{request.language_code}'. Use PUT to update."
+            )
+
+        success = await service.update_translation(
+            key_id=request.key_id,
+            language_code=request.language_code,
+            value=request.value,
+            updated_by=request.updated_by
+        )
+
+        if not success:
+            raise HTTPException(status_code=400, detail="Failed to create translation")
+
+        return {
+            "success": True,
+            "message": "Translation created successfully",
+            "key_id": request.key_id,
+            "language_code": request.language_code
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to create translation: {str(e)}")
+
 @app.post("/translations/bulk-update")
 async def bulk_update_translations(
     request: BulkUpdateRequest,
@@ -168,30 +204,6 @@ async def get_analytics(
         return AnalyticsResponse(**analytics)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch analytics: {str(e)}")
-
-# Legacy endpoint (from original requirement)
-@app.get("/localizations/{project_id}/{locale}")
-async def get_localizations(
-    project_id: str,
-    locale: str,
-    service: TranslationService = Depends(get_translation_service)
-):
-    """Legacy endpoint for getting localizations for a project and locale"""
-    try:
-        keys, _ = await service.get_translation_keys(project_id=project_id, limit=1000)
-
-        localizations = {}
-        for key in keys:
-            if locale in key.translations:
-                localizations[key.key] = key.translations[locale].value
-
-        return {
-            "project_id": project_id,
-            "locale": locale,
-            "localizations": localizations
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch localizations: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

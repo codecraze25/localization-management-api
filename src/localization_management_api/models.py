@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Dict, List, Optional
 from datetime import datetime
 
@@ -37,13 +37,19 @@ class CreateTranslationKeyRequest(BaseModel):
     key: str
     category: str
     description: Optional[str] = None
-    project_id: str
-    initial_translations: Optional[Dict[str, str]] = None
+    project_id: str = Field(alias="projectId")
+    initial_translations: Optional[Dict[str, str]] = Field(default=None, alias="initialTranslations")
 
 class UpdateTranslationRequest(BaseModel):
     key_id: str
     language_code: str
     value: str
+
+class CreateTranslationRequest(BaseModel):
+    key_id: str
+    language_code: str
+    value: str
+    updated_by: Optional[str] = "api_user"
 
 class BulkUpdateRequest(BaseModel):
     updates: List[UpdateTranslationRequest]

@@ -47,10 +47,28 @@ class TranslationService:
                 )
 
             # Apply missing translations filter if requested
-            if missing_translations and language_code:
-                # Show only keys that DON'T have the specified language translation
-                if language_code in translations:
-                    continue
+            if missing_translations:
+                if language_code:
+                    # Show only keys that are MISSING the specified language translation
+                    translation = translations.get(language_code)
+                    if translation and translation.value and translation.value.strip():
+                        continue  # Skip keys that have a valid translation for this language
+                else:
+                    # Show only keys that are missing translations for ANY language
+                    # Get all languages for this project first
+                    project_languages_result = supabase.table("project_languages").select("language_code").eq("project_id", project_id).execute()
+                    project_language_codes = [lang["language_code"] for lang in project_languages_result.data]
+
+                    # Check if this key has translations for all project languages
+                    has_all_translations = True
+                    for lang_code in project_language_codes:
+                        translation = translations.get(lang_code)
+                        if not translation or not translation.value or not translation.value.strip():
+                            has_all_translations = False
+                            break
+
+                    if has_all_translations:
+                        continue  # Skip keys that have all translations
 
             translation_key = TranslationKey(
                 id=row["id"],
