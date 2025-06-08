@@ -1,11 +1,13 @@
-from fastapi import FastAPI, HTTPException, Query, Depends
+from fastapi import FastAPI, HTTPException, Query, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from .config import get_settings
 from .services import TranslationService
+from .auth import AuthService
 from .models import (
     TranslationKey, GetTranslationKeysResponse, CreateTranslationKeyRequest,
-    UpdateTranslationRequest, CreateTranslationRequest, BulkUpdateRequest, AnalyticsResponse, Project, Language
+    UpdateTranslationRequest, CreateTranslationRequest, BulkUpdateRequest, AnalyticsResponse, Project, Language,
+    User, LoginRequest, LoginResponse, RegisterRequest
 )
 
 # Initialize FastAPI app
@@ -33,6 +35,30 @@ translation_service = TranslationService()
 # Dependency to get translation service
 def get_translation_service() -> TranslationService:
     return translation_service
+
+# Authentication dependency
+def get_current_user(authorization: Optional[str] = Header(None)) -> Optional[User]:
+    """Get current authenticated user from Authorization header"""
+    if not authorization:
+        return None
+
+    try:
+        scheme, token = authorization.split()
+        if scheme.lower() != "bearer":
+            return None
+        return AuthService.verify_token(token)
+    except ValueError:
+        return None
+
+def require_auth(current_user: Optional[User] = Depends(get_current_user)) -> User:
+    """Require authentication for protected endpoints"""
+    if not current_user:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    return current_user
 
 @app.get("/health")
 async def health_check():
@@ -136,6 +162,7 @@ async def update_translation(
     key_id: str,
     language_code: str,
     request: UpdateTranslationRequest,
+    current_user: User = Depends(require_auth),
     service: TranslationService = Depends(get_translation_service)
 ):
     """Update a translation value"""
@@ -144,7 +171,7 @@ async def update_translation(
             key_id=key_id,
             language_code=language_code,
             value=request.value,
-            updated_by="api_user"
+            updated_by=current_user.username
         )
         if not success:
             raise HTTPException(status_code=400, detail="Failed to update translation")
@@ -155,6 +182,7 @@ async def update_translation(
 @app.post("/translations")
 async def create_translation(
     request: CreateTranslationRequest,
+    current_user: User = Depends(require_auth),
     service: TranslationService = Depends(get_translation_service)
 ):
     """Create a new translation for an existing translation key"""
@@ -175,7 +203,7 @@ async def create_translation(
             key_id=request.key_id,
             language_code=request.language_code,
             value=request.value,
-            updated_by=request.updated_by
+            updated_by=current_user.username
         )
 
         if not success:
@@ -195,6 +223,7 @@ async def create_translation(
 @app.post("/translations/bulk-update")
 async def bulk_update_translations(
     request: BulkUpdateRequest,
+    current_user: User = Depends(require_auth),
     service: TranslationService = Depends(get_translation_service)
 ):
     """Bulk update multiple translations"""
@@ -204,7 +233,7 @@ async def bulk_update_translations(
                 "key_id": update.key_id,
                 "language_code": update.language_code,
                 "value": update.value,
-                "updated_by": "api_user"
+                "updated_by": current_user.username
             }
             for update in request.updates
         ]
@@ -230,6 +259,48 @@ async def get_analytics(
         return AnalyticsResponse(**analytics)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch analytics: {str(e)}")
+
+# Authentication endpoints
+@app.post("/auth/register", response_model=User)
+async def register(request: RegisterRequest):
+    """Register a new user"""
+    try:
+        user = AuthService.create_user(request)
+        return user
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/auth/login", response_model=LoginResponse)
+async def login(request: LoginRequest):
+    """Login user and get access token"""
+    user = AuthService.authenticate_user(request)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid username or password"
+        )
+
+    access_token = AuthService.create_access_token(user)
+    return LoginResponse(
+        user=user,
+        access_token=access_token,
+        token_type="bearer"
+    )
+
+@app.post("/auth/logout")
+async def logout(current_user: User = Depends(require_auth), authorization: str = Header(...)):
+    """Logout user and invalidate token"""
+    try:
+        _, token = authorization.split()
+        success = AuthService.logout(token)
+        return {"success": success, "message": "Logged out successfully"}
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid authorization header")
+
+@app.get("/auth/me", response_model=User)
+async def get_current_user_info(current_user: User = Depends(require_auth)):
+    """Get current user information"""
+    return current_user
 
 if __name__ == "__main__":
     import uvicorn

@@ -69,3 +69,28 @@ class AnalyticsResponse(BaseModel):
     total_keys: int
     completion_by_language: Dict[str, Dict[str, int]]
     last_updated: datetime
+
+class User(BaseModel):
+    id: str
+    username: str
+    email: str
+    full_name: str
+    created_at: datetime
+    updated_at: datetime
+    is_active: bool = True
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class LoginResponse(BaseModel):
+    user: User
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int = 3600  # 1 hour
+
+class RegisterRequest(BaseModel):
+    username: str
+    email: str
+    password: str
+    full_name: str

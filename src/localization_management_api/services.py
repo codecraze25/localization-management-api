@@ -142,13 +142,15 @@ class TranslationService:
         # Insert initial translations if provided
         if initial_translations:
             translation_data = []
+            current_time = datetime.utcnow().isoformat()
             for lang_code, value in initial_translations.items():
                 translation_data.append({
                     "id": str(uuid.uuid4()),
                     "translation_key_id": key_id,
                     "language_code": lang_code,
                     "value": value,
-                    "updated_by": "system"
+                    "updated_by": "system",
+                    "updated_at": current_time
                 })
 
             if translation_data:
@@ -169,11 +171,14 @@ class TranslationService:
         # Check if translation exists
         existing = supabase.table("translations").select("id").eq("translation_key_id", key_id).eq("language_code", language_code).execute()
 
+        current_time = datetime.utcnow().isoformat()
+
         if existing.data:
             # Update existing translation
             supabase.table("translations").update({
                 "value": value,
-                "updated_by": updated_by
+                "updated_by": updated_by,
+                "updated_at": current_time
             }).eq("translation_key_id", key_id).eq("language_code", language_code).execute()
         else:
             # Create new translation
@@ -182,7 +187,8 @@ class TranslationService:
                 "translation_key_id": key_id,
                 "language_code": language_code,
                 "value": value,
-                "updated_by": updated_by
+                "updated_by": updated_by,
+                "updated_at": current_time
             }).execute()
 
         return True

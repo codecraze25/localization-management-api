@@ -1,5 +1,5 @@
-fastapi
-uvicorn[standard]
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
 supabase
 pydantic
 pydantic-settings
@@ -7,3 +7,5 @@ python-dotenv
 pytest
 pytest-asyncio
 httpx
+python-multipart>=0.0.6
+PyJWT>=2.8.0
