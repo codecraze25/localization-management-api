@@ -207,6 +207,25 @@ class TranslationService:
 
         return success_count
 
+    async def delete_translation_key(self, key_id: str) -> bool:
+        """Delete a translation key and all its associated translations"""
+        try:
+            # Check if translation key exists
+            existing_key = await self.get_translation_key_by_id(key_id)
+            if not existing_key:
+                return False
+
+            # Delete all translations for this key first (due to foreign key constraints)
+            supabase.table("translations").delete().eq("translation_key_id", key_id).execute()
+
+            # Delete the translation key
+            result = supabase.table("translation_keys").delete().eq("id", key_id).execute()
+
+            return len(result.data) > 0
+        except Exception as e:
+            print(f"Failed to delete translation key: {e}")
+            return False
+
     async def get_projects(self) -> List[Project]:
         """Get all projects with their languages"""
         result = supabase.table("projects").select(

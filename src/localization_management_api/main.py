@@ -105,6 +105,32 @@ async def create_translation_key(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to create translation key: {str(e)}")
 
+@app.delete("/translation-keys/{key_id}")
+async def delete_translation_key(
+    key_id: str,
+    service: TranslationService = Depends(get_translation_service)
+):
+    """Delete a translation key and all its associated translations"""
+    try:
+        # Check if translation key exists
+        existing_key = await service.get_translation_key_by_id(key_id)
+        if not existing_key:
+            raise HTTPException(status_code=404, detail="Translation key not found")
+
+        success = await service.delete_translation_key(key_id)
+        if not success:
+            raise HTTPException(status_code=400, detail="Failed to delete translation key")
+
+        return {
+            "success": True,
+            "message": "Translation key deleted successfully",
+            "key_id": key_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to delete translation key: {str(e)}")
+
 @app.put("/translations/{key_id}/{language_code}")
 async def update_translation(
     key_id: str,
